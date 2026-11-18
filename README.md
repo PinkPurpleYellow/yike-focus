@@ -1,10 +1,16 @@
 # 一刻专注 · Yike Focus
 
-在安卓平板上安排专注和休息，记录今天想完成的任务。这款离线番茄钟支持全屏时钟、六种背景声、七天统计和自定义壁纸。
+一款为 Android 平板设计的液态玻璃番茄钟。上下滚动时，壁纸的颜色透过任务卡片和统计面板。手指划过悬浮导航，选中胶囊的圆角边缘会折射下方的内容，文字和时钟依然清晰。
 
-**[下载安卓版 2.4.0](https://github.com/PinkPurpleYellow/yike-focus/releases/download/v2.4.0/yike-focus-2.4.0.apk)**　·　[查看版本说明](https://github.com/PinkPurpleYellow/yike-focus/releases/tag/v2.4.0)　·　[隐私政策](https://pinkpurpleyellow.github.io/yike-focus/privacy-policy.html)
+**[下载安卓版 2.4.0](https://github.com/PinkPurpleYellow/yike-focus/releases/download/v2.4.0/yike-focus-2.4.0.apk)**　·　[更新记录](app/src/main/assets/changelog.txt)　·　[隐私政策全文](app/src/main/assets/privacy_policy.txt)
 
-![专注页面](docs/focus.png)
+![液态玻璃模式下的平板专注页，壁纸透过计时卡和悬浮导航](docs/liquid-glass.png)
+
+*2.4.0 应用界面，使用项目绘制的渐变壁纸进行主机渲染。*
+
+在「设置 → 外观与主题」选择「液态玻璃」，可以调整透明度和模糊强度。Android 13 及以上支持动态着色器折射，Android 12/12L 支持实时模糊，Android 8–11 使用兼容磨砂效果。喜欢安静的界面时，可以关闭装饰动效，或切回传统卡片。
+
+专注计时、任务清单和七天统计都能离线使用。开始一轮专注，打开全屏时钟，或为自己选一段雨声。
 
 ## 安装与升级
 
