@@ -38,7 +38,7 @@ class GlassGardenNextTest {
             val dialog=org.robolectric.shadows.ShadowDialog.getLatestDialog()
             val root=if(dialog?.isShowing==true) requireNotNull(dialog.window).decorView else view.rootView
             val bmp=Bitmap.createBitmap(root.width,root.height,Bitmap.Config.ARGB_8888)
-            root.draw(Canvas(bmp));val file=File("build/outputs/3.0.0/next-$name.png");file.parentFile!!.mkdirs()
+            root.draw(Canvas(bmp));val file=File("build/outputs/3.0.1/next-$name.png");file.parentFile!!.mkdirs()
             file.outputStream().use {bmp.compress(Bitmap.CompressFormat.PNG,100,it)};bmp.recycle()
         }
     }

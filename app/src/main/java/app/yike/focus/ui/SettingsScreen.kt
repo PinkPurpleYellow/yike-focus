@@ -84,7 +84,7 @@ fun SettingsScreen(settings: FocusSettings, onChange: ((FocusSettings) -> FocusS
     val deskApp=context.applicationContext as FocusApplication
     val workspace by deskApp.repository.workspace.collectAsState(initial="{}")
     val gardenUsed by deskApp.repository.gardenUsed.collectAsState(initial=emptySet())
-    if(org.json.JSONObject(workspace).optBoolean("discovered") || gardenUsed.isNotEmpty()) FocusTonalButton({garden=true}){Text("我的花房")}
+    val gardenVisible = org.json.JSONObject(workspace).optBoolean("discovered") || gardenUsed.isNotEmpty()
     SettingsPanels(listOf(
         SettingsSection("专注节奏") {
             PaperCard(Modifier.fillMaxWidth()) {
@@ -191,7 +191,7 @@ fun SettingsScreen(settings: FocusSettings, onChange: ((FocusSettings) -> FocusS
                     color = Muted, style = MaterialTheme.typography.bodySmall)
             }
         }
-    ))
+    ), settings, if (gardenVisible) ({ garden = true }) else null)
     if (garden) SecretGarden { garden = false }
     numberEdit?.let { edit -> NumberDialog(edit) { numberEdit = null } }
     if (backgroundHelp) FocusAlertDialog(onDismissRequest = { backgroundHelp = false },

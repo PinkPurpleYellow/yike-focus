@@ -63,7 +63,10 @@ fun FocusScreen(
     val summary: @Composable ()->Unit = { SummaryCards(today, settings.dailyGoal) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val repo = LocalDeskRepo.current
-    WidgetDesk("focus", fallback = { FocusPageLayout(summary, timer, taskList) }, emergency = {
+    WidgetDesk("focus", fallback = { FocusPageLayout(
+        { DeskCard("summary") { summary() } },
+        { m -> DeskCard("timer", m) { timer(Modifier.fillMaxWidth()) } },
+        { m -> DeskCard("tasks", m) { taskList(Modifier.fillMaxWidth()) } }) }, emergency = {
         if (state.status != RunStatus.READY) FocusButton(onFullscreen) { Text("返回计时控制") }
     }) { t -> when(t.id) {
         "timer" -> if(t.h==1 || t.w==1) PaperCard(Modifier.fillMaxWidth()) {

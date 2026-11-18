@@ -42,7 +42,7 @@ class GlassGpuTest {
         val bitmap=Bitmap.createBitmap(window.decorView.width,window.decorView.height,Bitmap.Config.ARGB_8888)
         compose.runOnUiThread {PixelCopy.request(window,bitmap,{code=it;latch.countDown()},Handler(Looper.getMainLooper()))}
         assertTrue("PixelCopy timed out",latch.await(8,TimeUnit.SECONDS));assertEquals(PixelCopy.SUCCESS,code)
-        val folder=File(compose.activity.getExternalFilesDir(null),"glass-gpu-3.0.0").apply{mkdirs()}
+        val folder=File(compose.activity.getExternalFilesDir(null),"glass-gpu-3.0.1").apply{mkdirs()}
         File(folder,"$name.png").outputStream().use {bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}
         return bitmap
     }

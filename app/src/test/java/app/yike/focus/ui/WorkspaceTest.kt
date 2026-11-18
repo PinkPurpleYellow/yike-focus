@@ -45,7 +45,7 @@ class WorkspaceTest {
             val root = WindowInspector.getGlobalWindowViews().last { it.width > 0 && it.height > 0 }
             val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
             root.draw(Canvas(bitmap))
-            val out = File("build/outputs/workspace-3.0.0/$name.png")
+            val out = File("build/outputs/workspace-3.0.1/$name.png")
             requireNotNull(out.parentFile).mkdirs()
             out.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
@@ -64,8 +64,8 @@ class WorkspaceTest {
         compose.onNodeWithTag("edit_focus").performScrollTo().performClick()
         compose.onNodeWithText("添加组件").performClick()
         compose.onNodeWithText("下一件任务").performScrollTo().performClick()
-        compose.onNodeWithTag("tile_next").assertExists()
-        compose.onNodeWithText("下一件任务").performScrollTo().performClick()
+        compose.onNodeWithTag("tile_next").performScrollTo().performTouchInput { click(center) }
+        compose.onNodeWithText("调整").performScrollTo().performClick()
         compose.onNodeWithText("加宽").performClick()
         compose.onNodeWithText("完成").performScrollTo().performClick()
         compose.waitUntil(10000) {
@@ -91,13 +91,13 @@ class WorkspaceTest {
         }
         compose.onNodeWithTag("edit_focus").performScrollTo().performClick()
         compose.onNodeWithTag("tile_timer").performTouchInput {
-            down(center)
+            down(androidx.compose.ui.geometry.Offset(width * .7f, 100f))
             moveBy(androidx.compose.ui.geometry.Offset(35f, 0f))
             moveBy(androidx.compose.ui.geometry.Offset(width * .83f, 0f), delayMillis = 32)
             up()
         }
         compose.waitForIdle()
-        compose.onNodeWithTag("resize_timer").performTouchInput {
+        compose.onNodeWithTag("resize_timer").performScrollTo().performTouchInput {
             down(center)
             moveBy(androidx.compose.ui.geometry.Offset(0f, 22f))
             moveBy(androidx.compose.ui.geometry.Offset(0f, 104f))
@@ -114,6 +114,72 @@ class WorkspaceTest {
             )
         assertEquals("tasks", list.first().id)
         assertEquals(3, list.first { it.id == "timer" }.h)
+    }
+
+    @Test
+    fun editingKeepsTheSameCardsAndPositions() {
+        val settings =
+            FocusSettings(interfaceMaterial = InterfaceMaterial.GLASS, decorativeMotion = false)
+        compose.setContent {
+            FocusTheme(settings) {
+                CompositionLocalProvider(LocalDeskRepo provides app.repository) {
+                    PreviewHost(settings, 0)
+                }
+            }
+        }
+        val ids = listOf("timer", "tasks", "summary")
+        fun bounds() =
+            ids.map { compose.onNodeWithTag("tile_$it").fetchSemanticsNode().boundsInWindow }
+        compose.onNodeWithTag("timer_primary").assertHasClickAction()
+        val original = bounds()
+        picture("01-正常")
+        compose.onNodeWithTag("edit_focus").performClick()
+        compose.waitForIdle()
+        assertEquals(original, bounds())
+        picture("02-编辑")
+        compose.onNodeWithTag("tile_tasks").performTouchInput { click(center) }
+        compose.waitForIdle()
+        val selected = bounds()
+        assertEquals(original[0], selected[0])
+        assertEquals(original[2], selected[2])
+        compose.onNodeWithTag("resize_tasks").assertExists()
+        compose.onNodeWithTag("resize_timer").assertDoesNotExist()
+        picture("03-选中")
+        compose.onNodeWithTag("tile_timer").performTouchInput { click(center) }
+        compose.onNodeWithTag("resize_tasks").assertDoesNotExist()
+        compose.onNodeWithTag("resize_timer").assertExists()
+        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithTag("timer_primary").assertHasClickAction()
+    }
+
+    @Test
+    @Config(qualifiers = "w390dp-h844dp-port-mdpi")
+    fun phoneSettingsRowsAndBack() {
+        val settings =
+            FocusSettings(
+                focusMinutes = 37,
+                shortBreakMinutes = 7,
+                interfaceMaterial = InterfaceMaterial.GLASS,
+            )
+        compose.setContent { FocusTheme(settings) { PreviewHost(settings, 2) } }
+        val categories =
+            listOf(0, 1, 2, 3, 5).map {
+                compose.onNodeWithTag("settings_section_$it").fetchSemanticsNode().boundsInWindow
+            }
+        assertTrue(
+            categories.all { it.width >= 320f && it.left == categories[0].left && it.height >= 48f }
+        )
+        compose.onNodeWithText("37 / 7 分钟").assertIsDisplayed()
+        picture("04-手机设置")
+        compose.onNodeWithTag("settings_section_2").performTouchInput {
+            click(androidx.compose.ui.geometry.Offset(width - 12f, centerY))
+        }
+        compose.onNodeWithTag("open_appearance").assertExists()
+        compose.onNodeWithText("‹ 设置").performClick()
+        assertEquals(
+            categories[0],
+            compose.onNodeWithTag("settings_section_0").fetchSemanticsNode().boundsInWindow,
+        )
     }
 
     @Test

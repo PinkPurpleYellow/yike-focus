@@ -43,7 +43,7 @@ class GlassPolishTest {
             val root=view.rootView
             bitmap=Bitmap.createBitmap(root.width,root.height,Bitmap.Config.ARGB_8888)
             root.draw(Canvas(bitmap))
-            val file=File("build/outputs/3.0.0/polish-$name.png");file.parentFile!!.mkdirs()
+            val file=File("build/outputs/3.0.1/polish-$name.png");file.parentFile!!.mkdirs()
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
         }
         return bitmap
@@ -239,7 +239,7 @@ class GlassPolishTest {
                 val sy=64f+((y+.5f-40f)-64f)/magnification-ny*bend+40f
                 output.setPixel(x,y,input.getPixel(sx.toInt().coerceIn(0,399),sy.toInt().coerceIn(0,207)))
             }
-            val file=File("build/outputs/3.0.0/polish-optics-$index.png");file.parentFile!!.mkdirs()
+            val file=File("build/outputs/3.0.1/polish-optics-$index.png");file.parentFile!!.mkdirs()
             file.outputStream().use {output.compress(Bitmap.CompressFormat.PNG,100,it)}
             frames+=output
         }
@@ -251,7 +251,7 @@ class GlassPolishTest {
         }
         val ratio=spacing(frames.last())/spacing(frames.first())
         assertTrue("The optical reference must magnify the input grid: $ratio",ratio>1.05f)
-        File("build/outputs/3.0.0/polish-optics.json").writeText("{\"restToPressedGridSpacingRatio\":$ratio,\"renderer\":\"CPU optical reference; shader compile/uniform checks are separate; not Android GPU\"}")
+        File("build/outputs/3.0.1/polish-optics.json").writeText("{\"restToPressedGridSpacingRatio\":$ratio,\"renderer\":\"CPU optical reference; shader compile/uniform checks are separate; not Android GPU\"}")
         frames.forEach {it.recycle()};input.recycle()
 
     }

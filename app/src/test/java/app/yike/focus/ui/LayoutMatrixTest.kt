@@ -52,7 +52,7 @@ class LayoutMatrixTest {
             val root = view.rootView
             val image = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
             root.draw(Canvas(image))
-            val file = File("build/outputs/layout-matrix-3.0.0/$name.png")
+            val file = File("build/outputs/layout-matrix-3.0.1/$name.png")
             file.parentFile!!.mkdirs()
             file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
             image.recycle()

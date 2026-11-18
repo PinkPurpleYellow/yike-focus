@@ -45,7 +45,7 @@ class GlassGardenUiTest {
             val root = view.rootView
             val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
             root.draw(Canvas(bitmap))
-            val file = File("build/outputs/3.0.0/$name.png"); file.parentFile!!.mkdirs()
+            val file = File("build/outputs/3.0.1/$name.png"); file.parentFile!!.mkdirs()
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }; bitmap.recycle()
         }
     }

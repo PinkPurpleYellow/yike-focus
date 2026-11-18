@@ -98,7 +98,7 @@ class GlassMotionDeviceTest {
             val report=JSONObject().put("device",Build.MODEL).put("refreshHz",hz).put("frames",times.size)
                 .put("p50Ms",times[times.size/2]/1e6).put("p95Ms",times[(times.size*.95).toInt()]/1e6)
                 .put("overBudgetRatio",times.count{it>budget}.toDouble()/times.size)
-            File(compose.activity.getExternalFilesDir(null),"workspace-motion-3.0.0.json").writeText(report.toString(2))
+            File(compose.activity.getExternalFilesDir(null),"workspace-motion-3.0.1.json").writeText(report.toString(2))
         } finally {
             compose.runOnUiThread {window.removeOnFrameMetricsAvailableListener(listener)}
             worker.quitSafely();compose.onNodeWithText("取消").performScrollTo().performClick()
@@ -137,7 +137,7 @@ class GlassMotionDeviceTest {
                 .put("frames",sorted.size).put("p50Ms",sorted[sorted.size/2]/1e6).put("p95Ms",sorted[(sorted.size*.95).toInt().coerceAtMost(sorted.lastIndex)]/1e6)
                 .put("overBudgetRatio",sorted.count {it>budget}.toDouble()/sorted.size).put("sceneRefreshesDuringDrag",sceneRefreshes)
                 .put("effectUpdates",GlassDiagnostics.effectUpdates).put("note","Measured device rendering; no host simulation")
-            File(compose.activity.getExternalFilesDir(null),"glass-motion-3.0.0.json").writeText(json.toString(2))
+            File(compose.activity.getExternalFilesDir(null),"glass-motion-3.0.1.json").writeText(json.toString(2))
         } finally {compose.runOnUiThread {window.removeOnFrameMetricsAvailableListener(listener)};thread.quitSafely()}
     }
 }

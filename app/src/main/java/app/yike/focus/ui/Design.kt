@@ -178,6 +178,10 @@ fun Glyph(name: String, modifier: Modifier = Modifier, color: Color = Ink) {
                 line(9f,4f,4f,4f); line(4f,4f,4f,9f); line(15f,4f,20f,4f); line(20f,4f,20f,9f)
                 line(4f,15f,4f,20f); line(4f,20f,9f,20f); line(15f,20f,20f,20f); line(20f,20f,20f,15f)
             }
+            "sound" -> {
+                val speaker=Path().apply { moveTo(3*u,10*u);lineTo(7*u,10*u);lineTo(12*u,6*u);lineTo(12*u,18*u);lineTo(7*u,14*u);lineTo(3*u,14*u);close() }
+                drawPath(speaker,color,style=Stroke(1.6f*u)); drawArc(color,-45f,90f,false,p(9f,5f),Size(12*u,14*u),style=Stroke(1.6f*u))
+            }
             "copy" -> { drawRoundRect(color,p(8f,7f),Size(11*u,14*u),style=Stroke(1.7f*u)); line(5f,16f,5f,3f); line(5f,3f,15f,3f) }
             "leaf" -> {
                 drawPath(Path().apply { moveTo(5*u,19*u); cubicTo(1*u,8*u,10*u,3*u,20*u,4*u); cubicTo(21*u,15*u,15*u,21*u,5*u,19*u) },color,style=Stroke(1.8f*u))

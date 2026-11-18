@@ -121,18 +121,18 @@ fun StatsScreen(records: List<FocusRecord>, liveRecord: FocusRecord?, today: Loc
         val wide = maxWidth >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.6f
         Column(Modifier.widthIn(max = if (preset == UiPreset.MINIMAL) 860.dp else 1500.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(gap)) {
-            SummaryCards(todayStats, dailyGoal)
+            DeskCard("summary") { SummaryCards(todayStats, dailyGoal) }
             if (wide && preset in listOf(UiPreset.FLIP, UiPreset.JOURNAL)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.Top) {
                     if (preset == UiPreset.JOURNAL) {
-                        Column(Modifier.weight(1.4f)) { entries() }
-                        Column(Modifier.weight(1f)) { trend() }
+                        Column(Modifier.weight(1.4f)) { DeskCard("history") { entries() } }
+                        Column(Modifier.weight(1f)) { DeskCard("week") { trend() } }
                     } else {
-                        Column(Modifier.weight(1f)) { trend() }
-                        Column(Modifier.weight(1.3f)) { entries() }
+                        Column(Modifier.weight(1f)) { DeskCard("week") { trend() } }
+                        Column(Modifier.weight(1.3f)) { DeskCard("history") { entries() } }
                     }
                 }
-            } else { trend(); entries() }
+            } else { DeskCard("week") { trend() }; DeskCard("history") { entries() } }
         }
     }
     }) { t -> when(t.id) {

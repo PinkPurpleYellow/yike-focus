@@ -77,7 +77,7 @@ class WallpaperUiTest {
             result = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
             root.draw(Canvas(result))
             if (name != null) {
-                val file = File("build/outputs/wallpaper-3.0.0/$name.png")
+                val file = File("build/outputs/wallpaper-3.0.1/$name.png")
                 file.parentFile!!.mkdirs()
                 file.outputStream().use { result.compress(Bitmap.CompressFormat.PNG, 100, it) }
             }

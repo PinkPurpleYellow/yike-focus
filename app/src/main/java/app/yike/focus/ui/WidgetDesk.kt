@@ -1,7 +1,7 @@
 package app.yike.focus.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -13,15 +13,15 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.zIndex
@@ -147,7 +147,9 @@ internal fun WidgetDesk(
         draft = encodeTiles(list)
         reset = false
     }
+    val interaction = remember(page) { CardEditor() }
     BackHandler(editing && !library && menu == null) { editing = false }
+    LaunchedEffect(editing) { if (!editing) interaction.select(null) }
     Column(
         Modifier.fillMaxWidth()
             .then(
@@ -156,20 +158,108 @@ internal fun WidgetDesk(
                 else Modifier
             )
     ) {
-        if (!editing) {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+        Box(Modifier.fillMaxWidth().heightIn(min = 52.dp), contentAlignment = Alignment.CenterEnd) {
+            if (!editing)
                 FocusTextButton({ enter() }, modifier = Modifier.testTag("edit_$page")) {
                     Text("编辑布局")
                 }
-            }
-            if (saved == "default") fallback()
-            else {
-                if (page == "focus" && items.none { it.id == "timer" }) emergency()
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val n = columns(maxWidth, LocalDensity.current.fontScale)
-                    WidgetGrid(items, n, tile)
+            else
+                BoxWithConstraints {
+                    val compact = maxWidth / LocalDensity.current.fontScale < 610.dp
+                    var more by remember { mutableStateOf(false) }
+                    val resetLayout = {
+                        draft = encodeTiles(defaults)
+                        reset = true
+                        interaction.select(null)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FocusTextButton({ library = true }) { Text("添加组件") }
+                        if (compact)
+                            Box {
+                                FocusTextButton({ more = true }) { Text("更多") }
+                                FocusDropdownMenu(more, { more = false }) {
+                                    interaction.selected?.let { id ->
+                                        FocusMenuItem(
+                                            { Text("调整") },
+                                            {
+                                                more = false
+                                                menu = id
+                                            },
+                                        )
+                                        FocusMenuItem(
+                                            { Text("移除") },
+                                            {
+                                                more = false
+                                                update(items.filterNot { it.id == id })
+                                                interaction.select(null)
+                                            },
+                                        )
+                                    }
+                                    FocusMenuItem(
+                                        { Text("恢复预设") },
+                                        {
+                                            more = false
+                                            resetLayout()
+                                        },
+                                    )
+                                }
+                            }
+                        else {
+                            interaction.selected?.let { id ->
+                                FocusTextButton({ menu = id }) { Text("调整") }
+                                FocusTextButton({
+                                    update(items.filterNot { it.id == id })
+                                    interaction.select(null)
+                                }) {
+                                    Text("移除")
+                                }
+                            }
+                            FocusTextButton(resetLayout) { Text("恢复预设") }
+                        }
+                        FocusTextButton({ editing = false }, enabled = !busy) { Text("取消") }
+                        FocusTextButton(
+                            {
+                                busy = true
+                                scope.launch {
+                                    try {
+                                        repo.reviseWorkspace {
+                                            if (
+                                                reset ||
+                                                    saved == "default" &&
+                                                        draft == encodeTiles(defaults)
+                                            )
+                                                it.remove(page)
+                                            else it.put(page, draft)
+                                        }
+                                        editing = false
+                                    } catch (_: java.io.IOException) {
+                                        error = true
+                                    } finally {
+                                        busy = false
+                                    }
+                                }
+                            },
+                            enabled = !busy,
+                        ) {
+                            Text("完成")
+                        }
+                    }
                 }
-                if (items.isEmpty())
+        }
+        if (error && editing) Text("布局保存失败，请重试。")
+        val originalLayout =
+            if (editing) reset || saved == "default" && draft == encodeTiles(defaults)
+            else saved == "default"
+        DeskSurface(interaction, editing, items, ::update, { menu = it }) {
+            if (originalLayout) fallback()
+            else {
+                if (!editing && page == "focus" && items.none { it.id == "timer" }) emergency()
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    WidgetGrid(items, columns(maxWidth, LocalDensity.current.fontScale)) { item ->
+                        DeskCard(item.id) { tile(item) }
+                    }
+                }
+                if (items.isEmpty() && !editing)
                     FocusOutlinedButton({
                         enter()
                         library = true
@@ -177,39 +267,6 @@ internal fun WidgetDesk(
                         Text("添加组件")
                     }
             }
-        } else {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FocusButton({ library = true }) { Text("添加组件") }
-                FocusTextButton({
-                    draft = encodeTiles(defaults)
-                    reset = true
-                }) {
-                    Text("恢复预设")
-                }
-                FocusTextButton({ editing = false }, enabled = !busy) { Text("取消") }
-                FocusTonalButton(
-                    {
-                        busy = true
-                        scope.launch {
-                            try {
-                                repo.reviseWorkspace {
-                                    if (reset) it.remove(page) else it.put(page, draft)
-                                }
-                                editing = false
-                            } catch (_: java.io.IOException) {
-                                error = true
-                            } finally {
-                                busy = false
-                            }
-                        }
-                    },
-                    enabled = !busy,
-                ) {
-                    Text("完成")
-                }
-            }
-            if (error) Text("布局保存失败，请重试。")
-            EditableGrid(items, ::update, { menu = it }, tile)
         }
     }
     if (library)
@@ -284,236 +341,275 @@ internal fun WidgetDesk(
     }
 }
 
+private class CardEditor {
+    var selected by mutableStateOf<String?>(null)
+        private set
+
+    fun select(id: String?) {
+        selected = id
+    }
+
+    val bounds = mutableStateMapOf<String, Rect>()
+    var dragged by mutableStateOf<String?>(null)
+    var finger by mutableStateOf(Offset.Zero)
+    var grip = Offset.Zero
+    var downPoint = Offset.Zero
+    var rootOrigin = Offset.Zero
+    var resizing = false
+
+    fun hit(point: Offset) = bounds.entries.firstOrNull { it.value.contains(point) }?.key
+
+    fun inCorner(id: String, point: Offset, hitSize: Float): Boolean {
+        val rect = bounds[id] ?: return false
+        return point.x >= rect.right - hitSize && point.y >= rect.bottom - hitSize
+    }
+}
+
+private data class CardMode(
+    val state: CardEditor,
+    val editing: Boolean,
+    val items: List<Tile>,
+    val actions: (String) -> Unit,
+)
+
+private val LocalCardMode = compositionLocalOf<CardMode?> { null }
+
 @Composable
-private fun EditableGrid(
+private fun DeskSurface(
+    editor: CardEditor,
+    editing: Boolean,
     items: List<Tile>,
     update: (List<Tile>) -> Unit,
     menu: (String) -> Unit,
-    tile: @Composable (Tile) -> Unit,
+    content: @Composable () -> Unit,
 ) {
-    val density = LocalDensity.current
+    val current by rememberUpdatedState(items)
+    val onUpdate by rememberUpdatedState(update)
     val scroll = LocalDeskScroll.current
     val view = LocalView.current
-    val latest by rememberUpdatedState(items)
-    val change by rememberUpdatedState(update)
-    var active by remember { mutableStateOf<String?>(null) }
-    var drag by remember { mutableStateOf(Offset.Zero) }
-    var anchor by remember { mutableStateOf(Offset.Zero) }
-    var grab by remember { mutableStateOf(Offset.Zero) }
-    var startScroll by remember { mutableIntStateOf(0) }
-    var screenY by remember { mutableFloatStateOf(0f) }
-    var gridY by remember { mutableFloatStateOf(0f) }
-    val duration = motionMillis(180)
+    val density = LocalDensity.current
+    fun reorder() {
+        val id = editor.dragged ?: return
+        val target = editor.hit(editor.finger) ?: return
+        val from = current.indexOfFirst { it.id == id }
+        val to = current.indexOfFirst { it.id == target }
+        if (from >= 0 && to >= 0 && from != to)
+            onUpdate(current.toMutableList().apply { add(to, removeAt(from)) })
+    }
+    LaunchedEffect(editor.dragged, editing) {
+        if (!editing || editor.dragged == null || editor.resizing || scroll == null)
+            return@LaunchedEffect
+        val edge = with(density) { 92.dp.toPx() }
+        var last = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            val dt = ((now - last) / 1e9f).coerceAtMost(.05f)
+            last = now
+            val y = editor.finger.y
+            val direction =
+                when {
+                    y < edge -> (y - edge) / edge
+                    y > view.height - edge -> (y - view.height + edge) / edge
+                    else -> 0f
+                }
+            if (
+                direction != 0f &&
+                    scroll.scrollBy(direction.coerceIn(-1f, 1f) * edge * 6 * dt) != 0f
+            )
+                reorder()
+        }
+    }
     BoxWithConstraints(
-        Modifier.fillMaxWidth().onGloballyPositioned { gridY = it.positionInWindow().y }
+        Modifier.fillMaxWidth().onGloballyPositioned {
+            editor.rootOrigin = it.localToWindow(Offset.Zero)
+        }
     ) {
         val n = columns(maxWidth, density.fontScale)
-        val gap = 8.dp
-        val step = (maxWidth + gap) / n
-        val row = (96 * density.fontScale.coerceIn(1f, 2f)).dp
-        val screenX = remember { mutableFloatStateOf(0f) }
-        val relax = remember { androidx.compose.animation.core.Animatable(0f) }
-        val scope = rememberCoroutineScope()
-        var settling by remember { mutableStateOf<String?>(null) }
-        var releaseOffset by remember { mutableStateOf(Offset.Zero) }
-        var initialOrder by remember { mutableStateOf(emptyList<Tile>()) }
-        fun reorderUnderPointer() {
-            val id = active ?: return
-            val layout = latest
-            val positions = slots(layout, n)
-            val x = screenX.floatValue
-            val y = screenY - gridY
-            val target =
-                positions.indices.firstOrNull { i ->
-                    val (cx, cy) = positions[i]
-                    with(density) {
-                        x >= cx * step.toPx() &&
-                            x < (cx + layout[i].w.coerceAtMost(n)) * step.toPx() &&
-                            y >= cy * row.toPx() &&
-                            y < (cy + layout[i].h) * row.toPx()
-                    }
-                } ?: return
-            val from = layout.indexOfFirst { it.id == id }
-            if (from >= 0 && target != from)
-                change(layout.toMutableList().apply { add(target, removeAt(from)) })
-        }
-        LaunchedEffect(active, n) {
-            if (active == null || scroll == null) return@LaunchedEffect
-            var previous = withFrameNanos { it }
-            while (true) {
-                val now = withFrameNanos { it }
-                val elapsed = ((now - previous) / 1e9f).coerceIn(0f, .05f)
-                previous = now
-                val edge = with(density) { 96.dp.toPx() }
-                val direction =
-                    when {
-                        screenY < edge -> (screenY - edge) / edge
-                        screenY > view.height - edge -> (screenY - view.height + edge) / edge
-                        else -> 0f
-                    }
-                if (
-                    direction != 0f &&
-                        scroll.scrollBy(direction.coerceIn(-1f, 1f) * edge * 6 * elapsed) != 0f
-                )
-                    reorderUnderPointer()
-            }
-        }
-        val spots = slots(items, n)
-        val rows = items.indices.maxOfOrNull { spots[it].second + items[it].h } ?: 1
-        Box(Modifier.fillMaxWidth().height(row * rows + 8.dp)) {
-            items.forEachIndexed { i, t ->
-                key(t.id) {
-                    val x = step * spots[i].first
-                    val y = row * spots[i].second
-                    val ax by animateDpAsState(x, tween(duration), label = "tile_x")
-                    val ay by animateDpAsState(y, tween(duration), label = "tile_y")
-                    val moving = active == t.id
-                    Box(
-                        Modifier.zIndex(if (moving) 2f else 0f)
-                            .width(step * t.w.coerceAtMost(n) - gap)
-                            .height(row * t.h - gap)
-                            .graphicsLayer {
-                                translationX =
-                                    when {
-                                        moving -> anchor.x + drag.x
-                                        settling == t.id -> x.toPx() + releaseOffset.x * relax.value
-                                        else -> ax.toPx()
-                                    }
-                                translationY =
-                                    when {
-                                        moving ->
-                                            anchor.y + drag.y + (scroll?.value ?: 0) - startScroll
-                                        settling == t.id -> y.toPx() + releaseOffset.y * relax.value
-                                        else -> ay.toPx()
-                                    }
-                            }
-                            .background(if (moving) Peach else CardPaper, PanelShape)
-                            .border(1.dp, if (moving) Tomato else Line, PanelShape)
-                            .pointerInput(t.id, n, step, row) {
-                                detectDragGestures(
-                                    onDragStart = { point ->
-                                        val index = latest.indexOfFirst { it.id == t.id }
-                                        val pos = slots(latest, n)[index]
-                                        anchor =
-                                            Offset(step.toPx() * pos.first, row.toPx() * pos.second)
-                                        initialOrder = latest
-                                        drag = Offset.Zero
-                                        grab = point
-                                        screenX.floatValue = anchor.x + point.x
-                                        screenY = gridY + anchor.y + point.y
-                                        startScroll = scroll?.value ?: 0
-                                        settling = null
-                                        active = t.id
-                                    },
-                                    onDragEnd = {
-                                        val pos =
-                                            slots(latest, n)[latest.indexOfFirst { it.id == t.id }]
-                                        releaseOffset =
-                                            Offset(
-                                                anchor.x + drag.x - pos.first * step.toPx(),
-                                                anchor.y + drag.y + (scroll?.value ?: 0) -
-                                                    startScroll -
-                                                    pos.second * row.toPx(),
+        val step = with(density) { (maxWidth / n).toPx() }
+        val row = with(density) { 96.dp.toPx() }
+        Box(
+            Modifier.fillMaxWidth()
+                .then(
+                    if (editing)
+                        Modifier.pointerInput(editor) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event =
+                                            awaitPointerEvent(
+                                                androidx.compose.ui.input.pointer.PointerEventPass
+                                                    .Initial
                                             )
-                                        active = null
-                                        if (duration > 0)
-                                            scope.launch {
-                                                relax.snapTo(1f)
-                                                settling = t.id
-                                                relax.animateTo(0f, tween(duration))
-                                                if (settling == t.id) settling = null
+                                        event.changes
+                                            .firstOrNull { it.pressed && !it.previousPressed }
+                                            ?.let {
+                                                editor.downPoint = editor.rootOrigin + it.position
                                             }
-                                    },
-                                    onDragCancel = {
-                                        active = null
-                                        change(initialOrder)
-                                    },
-                                ) { event, delta ->
-                                    event.consume()
-                                    drag += delta
-                                    screenY += delta.y
-                                    screenX.floatValue = anchor.x + drag.x + grab.x
-                                    reorderUnderPointer()
+                                    }
                                 }
                             }
-                            .testTag("tile_${t.id}")
-                    ) {
-                        if (t.h > 1)
-                            Miniature(
-                                Modifier.matchParentSize()
-                                    .padding(
-                                        start = 10.dp,
-                                        end = 10.dp,
-                                        top = 46.dp,
-                                        bottom = 28.dp,
-                                    )
-                            ) {
-                                tile(t)
-                            }
-                        Box(
-                            Modifier.matchParentSize().pointerInput(Unit) {
-                                awaitPointerEventScope { while (true) awaitPointerEvent() }
-                            }
-                        )
-                        FocusTextButton(
-                            { menu(t.id) },
-                            modifier = Modifier.align(Alignment.TopStart),
-                        ) {
-                            Text(widgetNames.getValue(t.id))
-                        }
-                        Text(
-                            "${t.w} × ${t.h}",
-                            Modifier.align(Alignment.BottomStart).padding(7.dp),
-                            color = Muted,
-                        )
-                        Box(
-                            Modifier.align(Alignment.BottomEnd)
-                                .testTag("resize_${t.id}")
-                                .size(48.dp)
-                                .clickable { menu(t.id) }
-                                .pointerInput(t.id, n, step, row) {
-                                    var initial = t
-                                    var sum = Offset.Zero
-                                    detectDragGestures(
-                                        onDragStart = {
-                                            initial = latest.first { it.id == t.id }
-                                            sum = Offset.Zero
+                            .pointerInput(editor, n) {
+                                var initial = listOf<Tile>()
+                                var original: Tile? = null
+                                var start = Offset.Zero
+                                detectDragGestures(
+                                    onDragStart = { point ->
+                                        start = editor.downPoint
+                                        val id = editor.hit(start)
+                                        if (id != null) {
+                                            initial = current
+                                            original = current.firstOrNull { it.id == id }
+                                            editor.resizing =
+                                                editor.selected == id &&
+                                                    editor.inCorner(id, start, 48.dp.toPx())
+                                            editor.select(id)
+                                            editor.grip = start - editor.bounds.getValue(id).topLeft
+                                            editor.finger = start
+                                            editor.dragged = id
                                         }
-                                    ) { e, delta ->
-                                        e.consume()
-                                        sum += delta
-                                        val next =
-                                            initial.copy(
-                                                w =
-                                                    (initial.w + (sum.x / step.toPx()).roundToInt())
-                                                        .coerceIn(1, 4),
-                                                h =
-                                                    (initial.h + (sum.y / row.toPx()).roundToInt())
-                                                        .coerceIn(1, 3),
-                                            )
-                                        if (latest.first { it.id == t.id } != next)
-                                            change(latest.map { if (it.id == t.id) next else it })
+                                    },
+                                    onDragEnd = {
+                                        editor.dragged = null
+                                        editor.resizing = false
+                                    },
+                                    onDragCancel = {
+                                        if (editor.dragged != null) onUpdate(initial)
+                                        editor.dragged = null
+                                        editor.resizing = false
+                                    },
+                                ) { event, delta ->
+                                    val t = original
+                                    if (editor.dragged != null && t != null) {
+                                        event.consume()
+                                        editor.finger += delta
+                                        if (editor.resizing) {
+                                            val diff = editor.finger - start
+                                            val next =
+                                                t.copy(
+                                                    w =
+                                                        (t.w + (diff.x / step).roundToInt())
+                                                            .coerceIn(1, 4),
+                                                    h =
+                                                        (t.h + (diff.y / row).roundToInt())
+                                                            .coerceIn(1, 3),
+                                                )
+                                            if (current.firstOrNull { it.id == t.id } != next)
+                                                onUpdate(
+                                                    current.map { if (it.id == t.id) next else it }
+                                                )
+                                        } else reorder()
                                     }
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text("↘", color = Tomato)
-                        }
-                    }
-                }
+                                }
+                            }
+                    else Modifier
+                )
+        ) {
+            CompositionLocalProvider(
+                LocalCardMode provides CardMode(editor, editing, items, menu)
+            ) {
+                content()
             }
         }
     }
 }
 
-/**
- * Use the same occupancy model in edit and display. Grow tracks to fit actual text at this font
- * size.
- */
+@Composable
+internal fun DeskCard(id: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val mode = LocalCardMode.current
+    val editor = mode?.state
+    // Track untransformed bounds: selection scales only the drawing, not the drop targets.
+    val selected = mode?.editing == true && editor?.selected == id
+    val scale by
+        animateFloatAsState(
+            if (selected) .98f else 1f,
+            tween(motionMillis(130)),
+            label = "card_selection",
+        )
+    DisposableEffect(editor, id) { onDispose { editor?.bounds?.remove(id) } }
+    Box(
+        modifier
+            .fillMaxWidth()
+            .testTag("tile_$id")
+            .onGloballyPositioned { coordinates ->
+                val origin = coordinates.localToWindow(Offset.Zero)
+                editor
+                    ?.bounds
+                    ?.set(
+                        id,
+                        Rect(
+                            origin,
+                            androidx.compose.ui.geometry.Size(
+                                coordinates.size.width.toFloat(),
+                                coordinates.size.height.toFloat(),
+                            ),
+                        ),
+                    )
+            }
+            .zIndex(if (editor?.dragged == id) 1f else 0f)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationX = 0f
+                translationY = 0f
+                val bounds = editor?.bounds?.get(id)
+                if (editor != null && bounds != null && editor.dragged == id && !editor.resizing) {
+                    val distance = editor.finger - editor.grip - bounds.topLeft
+                    translationX = distance.x
+                    translationY = distance.y
+                }
+            },
+        propagateMinConstraints = true,
+    ) {
+        Box(
+            Modifier.then(
+                if (mode?.editing == true) Modifier.clearAndSetSemantics {} else Modifier
+            ),
+            propagateMinConstraints = true,
+        ) {
+            content()
+        }
+        if (mode != null && mode.editing) {
+            val t = mode.items.firstOrNull { it.id == id }
+            Box(
+                Modifier.matchParentSize()
+                    .clickable(
+                        interactionSource =
+                            remember {
+                                androidx.compose.foundation.interaction.MutableInteractionSource()
+                            },
+                        indication = null,
+                    ) {
+                        mode.state.select(id)
+                    }
+                    .semantics {
+                        contentDescription = widgetNames.getValue(id)
+                        this.selected = selected
+                        stateDescription = "${t?.w ?: 2} × ${t?.h ?: 2}"
+                        customActions =
+                            listOf(
+                                CustomAccessibilityAction("调整位置和大小") {
+                                    mode.state.select(id)
+                                    mode.actions(id)
+                                    true
+                                }
+                            )
+                    }
+            )
+            if (selected)
+                Box(Modifier.matchParentSize()) {
+                    Spacer(Modifier.align(Alignment.BottomEnd).size(48.dp).testTag("resize_$id"))
+                }
+        }
+    }
+}
+
 @Composable
 private fun WidgetGrid(items: List<Tile>, columns: Int, content: @Composable (Tile) -> Unit) {
     androidx.compose.ui.layout.Layout(
-        content = { items.forEach { item -> key(item.id) { Box(propagateMinConstraints = true) { content(item) } } } }
+        content = {
+            items.forEach { item ->
+                key(item.id) { Box(propagateMinConstraints = true) { content(item) } }
+            }
+        }
     ) { children, constraints ->
         val gap = 12.dp.roundToPx()
         val unit = (constraints.maxWidth + gap).toFloat() / columns
@@ -547,30 +643,6 @@ private fun WidgetGrid(items: List<Tile>, columns: Int, content: @Composable (Ti
                     (positions[i].first * unit).roundToInt(),
                     tops[positions[i].second],
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun Miniature(modifier: Modifier, content: @Composable () -> Unit) {
-    androidx.compose.ui.layout.Layout(
-        modifier = modifier.clip(SmallShape).clearAndSetSemantics {},
-        content = { Box { content() } },
-    ) { children, c ->
-        val width = c.maxWidth.coerceAtLeast(360.dp.roundToPx())
-        val placeable = children.single().measure(Constraints.fixedWidth(width))
-        val scale =
-            min(
-                    c.maxWidth.toFloat() / width,
-                    c.maxHeight.toFloat() / placeable.height.coerceAtLeast(1),
-                )
-                .coerceAtMost(1f)
-        layout(c.maxWidth, c.maxHeight) {
-            placeable.placeWithLayer(((c.maxWidth - width * scale) / 2).roundToInt(), 0) {
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                scaleX = scale
-                scaleY = scale
             }
         }
     }

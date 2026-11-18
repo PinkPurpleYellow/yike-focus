@@ -49,7 +49,7 @@ class GlassCompatibilityTest {
             val root=requireNotNull(view).rootView
             val image=Bitmap.createBitmap(root.width,root.height,Bitmap.Config.ARGB_8888)
             root.draw(Canvas(image))
-            val output=File("build/outputs/3.0.0/compatibility-api${android.os.Build.VERSION.SDK_INT}.png")
+            val output=File("build/outputs/3.0.1/compatibility-api${android.os.Build.VERSION.SDK_INT}.png")
             output.parentFile!!.mkdirs(); output.outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) }; image.recycle()
         }
         compose.onNodeWithText("查看").performClick()

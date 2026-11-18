@@ -39,7 +39,7 @@ class WallpaperComparisonTest {
             val root = compose.activity.window.decorView
             val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
             root.draw(Canvas(bitmap))
-            val file = File("build/outputs/comparison-3.0.0/$name.png")
+            val file = File("build/outputs/comparison-3.0.1/$name.png")
             file.parentFile!!.mkdirs()
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
