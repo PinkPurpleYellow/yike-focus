@@ -2,7 +2,7 @@
 
 一款为 Android 平板设计的液态玻璃番茄钟。上下滚动时，壁纸的颜色透过任务卡片和统计面板。手指划过悬浮导航，选中胶囊的圆角边缘会折射下方的内容，文字和时钟依然清晰。
 
-**[下载安卓版 2.4.0](https://github.com/PinkPurpleYellow/yike-focus/releases/download/v2.4.0/yike-focus-2.4.0.apk)**　·　[更新记录](app/src/main/assets/changelog.txt)　·　[隐私政策全文](app/src/main/assets/privacy_policy.txt)
+**[下载安卓版 3.0.0](https://github.com/PinkPurpleYellow/yike-focus/releases/download/v3.0.0/yike-focus-3.0.0.apk)**　·　[更新记录](app/src/main/assets/changelog.txt)　·　[隐私政策全文](app/src/main/assets/privacy_policy.txt)
 
 ![液态玻璃模式下的平板专注页，壁纸透过计时卡和悬浮导航](docs/liquid-glass.png)
 
