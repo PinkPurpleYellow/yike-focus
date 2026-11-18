@@ -72,6 +72,38 @@ class GlassMotionDeviceTest {
         assertTrue("Label must participate in refraction",difference(bounds.center.y,bounds.bottom)>10)
         before.recycle();after.recycle()
     }
+    @Test fun measureWorkspaceReorderAndResizeFrames() {
+        val app = compose.activity.application as FocusApplication
+        kotlinx.coroutines.runBlocking { app.repository.setLegalConsentVersion(1) }
+        compose.waitUntil(10000) { compose.onAllNodesWithTag("edit_focus").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("edit_focus").performScrollTo().performClick()
+        compose.onNodeWithText("恢复预设").performClick()
+        val worker = HandlerThread("workspace-frame-metrics").apply { start() }
+        val frames = Collections.synchronizedList(mutableListOf<Long>())
+        val listener = Window.OnFrameMetricsAvailableListener { _, metrics, _ -> frames.add(metrics.getMetric(FrameMetrics.TOTAL_DURATION)) }
+        val window = compose.activity.window
+        compose.runOnUiThread { window.addOnFrameMetricsAvailableListener(listener, Handler(worker.looper)) }
+        try {
+            val tile = compose.onNodeWithTag("tile_timer")
+            tile.performTouchInput { down(center) }
+            repeat(96) { i -> tile.performTouchInput { moveBy(Offset(if ((i/24)%2==0) 7f else -7f,0f),delayMillis=16) }; SystemClock.sleep(16) }
+            tile.performTouchInput { up() }
+            compose.onNodeWithTag("resize_timer").performScrollTo().performTouchInput {
+                down(center); repeat(36) { moveBy(Offset(1f,4f),delayMillis=16) };up()
+            }
+            compose.waitForIdle()
+            val times = synchronized(frames){frames.sorted()};assertTrue(times.size>=30)
+            val hz=compose.activity.display?.refreshRate ?: 60f
+            val budget=1e9/hz
+            val report=JSONObject().put("device",Build.MODEL).put("refreshHz",hz).put("frames",times.size)
+                .put("p50Ms",times[times.size/2]/1e6).put("p95Ms",times[(times.size*.95).toInt()]/1e6)
+                .put("overBudgetRatio",times.count{it>budget}.toDouble()/times.size)
+            File(compose.activity.getExternalFilesDir(null),"workspace-motion-3.0.0.json").writeText(report.toString(2))
+        } finally {
+            compose.runOnUiThread {window.removeOnFrameMetricsAvailableListener(listener)}
+            worker.quitSafely();compose.onNodeWithText("取消").performScrollTo().performClick()
+        }
+    }
     @Test fun continuousNavigationDragRecordsActualFrameTimesAndSharedSceneReuse() {
         var page by mutableIntStateOf(0)
         compose.activityRule.scenario.onActivity {it.setContent {
@@ -105,7 +137,7 @@ class GlassMotionDeviceTest {
                 .put("frames",sorted.size).put("p50Ms",sorted[sorted.size/2]/1e6).put("p95Ms",sorted[(sorted.size*.95).toInt().coerceAtMost(sorted.lastIndex)]/1e6)
                 .put("overBudgetRatio",sorted.count {it>budget}.toDouble()/sorted.size).put("sceneRefreshesDuringDrag",sceneRefreshes)
                 .put("effectUpdates",GlassDiagnostics.effectUpdates).put("note","Measured device rendering; no host simulation")
-            File(compose.activity.getExternalFilesDir(null),"glass-motion-2.4.0.json").writeText(json.toString(2))
+            File(compose.activity.getExternalFilesDir(null),"glass-motion-3.0.0.json").writeText(json.toString(2))
         } finally {compose.runOnUiThread {window.removeOnFrameMetricsAvailableListener(listener)};thread.quitSafely()}
     }
 }

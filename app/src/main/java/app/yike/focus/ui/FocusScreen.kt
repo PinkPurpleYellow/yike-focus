@@ -1,5 +1,7 @@
 package app.yike.focus.ui
 
+import kotlinx.coroutines.launch
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -51,15 +54,35 @@ fun FocusScreen(
     SectionTitle(if (state.phase == Phase.FOCUS) "把注意力，留给这一刻。" else "休息，也是进步的一部分。",
         if (state.phase == Phase.FOCUS) "不必一下完成所有事，从一个番茄开始。" else "起身、远眺，给自己一点呼吸的时间。")
     Spacer(Modifier.height(LayoutGap))
-    FocusPageLayout(
-        summary = { SummaryCards(today, settings.dailyGoal) },
-        timer = { modifier ->
-            TimerCard(state, settings, elapsed, selectedTask?.title, onStart, onPause,
-                { if (state.phase == Phase.FOCUS) confirmEnd = true else onEnd() }, onSettings,
-                onAmbient, onVolume, onFullscreen, onPreview, previewing, modifier)
-        },
-        tasks = { modifier -> TasksCard(tasks, selectedTaskId, state, onSelectTask, onSaveTask, onDeleteTask, modifier) },
-    )
+    val timer: @Composable (Modifier)->Unit = { modifier ->
+        TimerCard(state, settings, elapsed, selectedTask?.title, onStart, onPause,
+            { if (state.phase == Phase.FOCUS) confirmEnd = true else onEnd() }, onSettings,
+            onAmbient, onVolume, onFullscreen, onPreview, previewing, modifier)
+    }
+    val taskList: @Composable (Modifier)->Unit = { m -> TasksCard(tasks, selectedTaskId, state, onSelectTask, onSaveTask, onDeleteTask, m) }
+    val summary: @Composable ()->Unit = { SummaryCards(today, settings.dailyGoal) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val repo = LocalDeskRepo.current
+    WidgetDesk("focus", fallback = { FocusPageLayout(summary, timer, taskList) }, emergency = {
+        if (state.status != RunStatus.READY) FocusButton(onFullscreen) { Text("返回计时控制") }
+    }) { t -> when(t.id) {
+        "timer" -> if(t.h==1 || t.w==1) PaperCard(Modifier.fillMaxWidth()) {
+            Text(state.phase.title); Text(durationText(state.remaining(elapsed)), style=MaterialTheme.typography.headlineMedium)
+            FocusButton(if(state.status==RunStatus.RUNNING) onPause else onStart){Text(if(state.status==RunStatus.RUNNING) "暂停" else "开始 / 继续")}; FocusTextButton(onFullscreen){Text("全屏控制")}
+        } else timer(Modifier.fillMaxWidth())
+        "tasks" -> taskList(Modifier.fillMaxWidth())
+        "summary" -> summary()
+        "next" -> PaperCard(Modifier.fillMaxWidth()) {
+            val task=selectedTask ?: tasks.firstOrNull { !it.completed };Text("下一件任务", style=MaterialTheme.typography.titleMedium);Text(task?.title ?: "自由专注")
+            FocusButton({scope.launch { repo?.selectTask(task?.id);onStart() }}, enabled=state.status==RunStatus.READY){Text("开始这一轮")}
+        }
+        "audio" -> PaperCard(Modifier.fillMaxWidth()) {
+            Text("背景声", style=MaterialTheme.typography.titleMedium);var open by remember { mutableStateOf(false) }
+            Box {FocusOutlinedButton({open=true}){Text(settings.ambient.title)};FocusDropdownMenu(open,{open=false}){ Ambient.entries.forEach{a->FocusMenuItem({Text(a.title)},{onAmbient(a);open=false})} }}
+            if(settings.ambient!=Ambient.OFF){FocusTextButton(onPreview){Text(if(previewing) "停止试听" else "试听")};var volume by remember(settings.ambientVolume){mutableFloatStateOf(settings.ambientVolume)};FocusSlider(volume,{volume=it},onValueChangeFinished={onVolume(volume)})}
+        }
+        "garden" -> GardenWidget()
+    } }
     if (confirmEnd) FocusAlertDialog(
         onDismissRequest = { confirmEnd = false }, title = { Text("结束这次专注？") },
         text = { Text("已专注的时间会保留在统计中，本次不计为完整一轮。") },
@@ -266,7 +289,7 @@ private fun TasksCard(
                 var menu by remember { mutableStateOf(false) }
                 val selected = task.id == selectedTaskId && !task.completed
                 Row(Modifier.fillMaxWidth().background(if(selected) (if(LocalAppearance.current.interfaceMaterial==InterfaceMaterial.GLASS) Tomato.copy(alpha=.12f) else Peach.copy(alpha=.65f)) else Color.Transparent, if (settingsClassic()) PanelShape else SmallShape)
-                    .clickable(enabled = !task.completed) { onSelect(task.id) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    .clip(if (settingsClassic()) PanelShape else SmallShape).clickable(enabled = !task.completed) { onSelect(task.id) }.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     FocusCheckbox(modifier = Modifier.semantics { contentDescription = "${task.title}的完成状态" }, checked = task.completed, onCheckedChange = { onSave(task.copy(completed = it)) })
                     Column(Modifier.weight(1f)) {
                         Text(task.title, style = MaterialTheme.typography.bodyLarge, color = if (task.completed) Muted else Ink,

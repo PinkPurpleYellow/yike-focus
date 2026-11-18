@@ -37,6 +37,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun StatsScreen(records: List<FocusRecord>, liveRecord: FocusRecord?, today: LocalDate, todayStats: DayStats, dailyGoal: Int) {
     var selectedDateText by rememberSaveable { mutableStateOf(today.toString()) }
+    var heatDetail by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedDate = LocalDate.parse(selectedDateText)
     var showDatePicker by remember { mutableStateOf(false) }
     var detail by remember { mutableStateOf<FocusRecord?>(null) }
@@ -115,6 +116,7 @@ fun StatsScreen(records: List<FocusRecord>, liveRecord: FocusRecord?, today: Loc
         }
     }
     }
+    WidgetDesk("stats", fallback = {
     BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         val wide = maxWidth >= 840.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.6f
         Column(Modifier.widthIn(max = if (preset == UiPreset.MINIMAL) 860.dp else 1500.dp).fillMaxWidth(),
@@ -133,6 +135,30 @@ fun StatsScreen(records: List<FocusRecord>, liveRecord: FocusRecord?, today: Loc
             } else { trend(); entries() }
         }
     }
+    }) { t -> when(t.id) {
+        "summary" -> SummaryCards(todayStats,dailyGoal)
+        "week" -> trend()
+        "history" -> entries()
+        "garden" -> GardenWidget()
+        "heat" -> PaperCard(Modifier.fillMaxWidth()) {
+            Text("四周热力图",style=MaterialTheme.typography.titleMedium)
+            val days=remember(records,today,zone){(27 downTo 0).map {Statistics.forDay(records,today.minusDays(it.toLong()),zone)}}
+            val max=days.maxOf{it.focusMs}.coerceAtLeast(60_000L)
+            days.chunked(7).forEach {row->Row {row.forEach { day->val date=day.date
+                Box(Modifier.weight(1f).heightIn(min=48.dp).padding(1.dp).background(Sage.copy(alpha=.08f+.64f*day.focusMs/max),SmallShape)
+                    .clickable {selectedDateText=date.toString(); heatDetail=date.toString()}.semantics {contentDescription="$date，${day.focusMs/60000} 分钟"},contentAlignment=Alignment.Center){Text(date.dayOfMonth.toString(),style=MaterialTheme.typography.bodySmall)}
+            }}}
+        }
+        "rank" -> PaperCard(Modifier.fillMaxWidth()) {
+            Text("近七天 · 任务用时",style=MaterialTheme.typography.titleMedium)
+            val ranking=remember(records,today,zone){records.groupBy {it.taskId}.map { (id, group)->
+                (if(id==null) "自由专注" else group.maxBy{it.endedAtMs}.taskTitle) to (0..6).sumOf{Statistics.forDay(group,today.minusDays(it.toLong()),zone).focusMs}
+            }.filter{it.second>0}.sortedByDescending{it.second}.take(5)}
+            if(ranking.isEmpty()) Text("完成一次专注后，在这里回看。",color=Muted)
+            ranking.forEachIndexed {i,(name,ms)->Text("${i+1}. $name　${durationText(ms)}",Modifier.padding(vertical=5.dp))}
+        }
+    } }
+    heatDetail?.let { date -> FocusAlertDialog({heatDetail=null}, title={Text(date)},text={Column(Modifier.verticalScroll(rememberScrollState())){Text("${selectedStats.completedRounds} 轮 · ${durationText(selectedStats.focusMs)}");if(history.isEmpty()) Text("这一天还没有专注记录");history.forEach { Text(it.taskTitle) }}},confirmButton={FocusTextButton({heatDetail=null}){Text("关闭")}}) }
     detail?.let { record ->
         FocusAlertDialog(onDismissRequest = { detail = null }, title = { Text("专注记录") },
             text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {

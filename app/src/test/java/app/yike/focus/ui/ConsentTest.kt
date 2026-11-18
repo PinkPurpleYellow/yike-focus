@@ -1,4 +1,4 @@
-﻿package app.yike.focus.ui
+package app.yike.focus.ui
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -33,7 +33,7 @@ class ConsentTest {
             val root = compose.activity.window.decorView
             val bmp = Bitmap.createBitmap(root.width,root.height,Bitmap.Config.ARGB_8888)
             root.draw(Canvas(bmp))
-            val file=File("build/outputs/legal-2.4.0/welcome.png")
+            val file=File("build/outputs/legal-3.0.0/welcome.png")
             requireNotNull(file.parentFile).mkdirs()
             file.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG,100,it) };bmp.recycle()
         }

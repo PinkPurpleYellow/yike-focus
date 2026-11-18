@@ -23,6 +23,7 @@ class FocusAppTest {
     @Test fun aboutShowsDeveloperEmailAndActualPackageVersion() {
         compose.waitUntil(10_000) { app.controller.loaded.value }
         compose.onNodeWithTag("nav_2").performClick()
+        compose.onNodeWithTag("settings_section_5").performScrollTo().performClick()
         compose.onNodeWithTag("developer_name").performScrollTo().assertTextEquals("PinkPurpleYellow")
         compose.onNodeWithTag("developer_email").performScrollTo().assertTextEquals("ff1921570609@outlook.com").assertHasClickAction()
         compose.onNodeWithTag("app_version").performScrollTo().assertTextEquals("版本 ${BuildConfig.VERSION_NAME}")

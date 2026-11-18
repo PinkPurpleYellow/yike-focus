@@ -44,6 +44,11 @@ import kotlinx.coroutines.launch
     val available=Garden.available(records,used).size
     val stage=Garden.stage(records,used);val harvests=Garden.harvests(records,used)
     var busy by remember {mutableStateOf(false)};var ripe by remember {mutableStateOf(false)}
+    val workspace by app.repository.workspace.collectAsState(initial="{}")
+    val decor = org.json.JSONObject(workspace).optInt("decor") and decorMask(harvests)
+    var draft by remember(decor){ mutableIntStateOf(decor) }
+    var decorating by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { app.repository.reviseWorkspace { it.put("discovered", true) } }
     var collection by remember {mutableStateOf(false)};var message by remember {mutableStateOf<String?>(null)}
     var variety by remember {mutableIntStateOf(harvests%Garden.VARIETIES)}
     val growth=remember {Animatable(stage.toFloat())};val water=remember {Animatable(0f)}
@@ -115,16 +120,25 @@ import kotlinx.coroutines.launch
                     FocusTextButton(onDismiss) {Text("返回")}
                 }
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    FocusFilterChip(!collection,{collection=false},label={Text("小花园")},modifier=Modifier.testTag("garden_tab"))
-                    FocusFilterChip(collection,{collection=true},label={Text("收获篮")},modifier=Modifier.testTag("collection_tab"))
+                    FocusFilterChip(!collection && !decorating,{collection=false;decorating=false},label={Text("温室")},modifier=Modifier.testTag("garden_tab"))
+                    FocusFilterChip(decorating,{draft=decor;decorating=true;collection=false},label={Text("布置")},modifier=Modifier.testTag("decorate_tab"))
+                    FocusFilterChip(collection,{collection=true;decorating=false},label={Text("收获篮")},modifier=Modifier.testTag("collection_tab"))
                 }
-                if(collection) GardenCollection(harvests)
+                if(decorating) {
+                    GardenLandscape(stage.toFloat(),0f,0f,0f,variety,Modifier.fillMaxWidth().height(220.dp),harvests,draft)
+                    listOf(Triple("青瓷花盆",1,1),Triple("胡桃木窗台",2,3),Triple("暮紫山景",4,6)).forEach { (name,bit,threshold) ->
+                        SwitchRow(name, if(harvests>=threshold) "已解锁，可随时更换" else "第 $threshold 次收获解锁", draft and bit!=0) {
+                            if(harvests>=threshold) draft=draft xor bit else message="第 $threshold 次收获后可布置$name。"
+                        }
+                    }
+                    FocusButton({scope.launch { app.repository.reviseWorkspace { it.put("decor",draft and decorMask(harvests)) };decorating=false;message="新布置已经安放好了。" }}){Text("应用布置")}
+                } else if(collection) GardenCollection(harvests)
                 else {
                     val scene:@Composable (Modifier)->Unit={m ->
                         Box(m.onGloballyPositioned {target=it.boundsInWindow()}) {
                             GardenLandscape(growth.value,sway.value,water.value,picking.value,variety,
                                 Modifier.fillMaxWidth().aspectRatio(if(wide) 1.12f else 1.18f)
-                                    .clickable(role=Role.Button,onClick=::touchPlant).testTag("garden_scene"),collected=(harvests-if(ripe) 1 else 0).coerceAtLeast(0))
+                                    .clickable(role=Role.Button,onClick=::touchPlant).testTag("garden_scene"),collected=(harvests-if(ripe) 1 else 0).coerceAtLeast(0),decor=decor)
                             Text(if(ripe) "轻点番茄，收下这一刻" else "轻触叶子，和它打个招呼",Modifier.align(Alignment.BottomCenter).padding(16.dp),
                                 style=MaterialTheme.typography.bodySmall,color=if(Paper.red<.5f) Color(0xFFE4ECE5) else Color(0xFF405849))
                         }
@@ -182,6 +196,8 @@ import kotlinx.coroutines.launch
 }
 
 @Composable internal fun GardenCollection(harvests:Int) {
+    var detail by remember {mutableIntStateOf(-1)}
+    if(detail in GardenVarieties.indices) FocusAlertDialog({detail=-1},title={Text(GardenVarieties[detail].name)},text={Column{GardenFruit(detail,harvests>detail,Modifier.fillMaxWidth().height(160.dp));Text("第 ${detail+1} 次收获时相见 · 已收藏 ${Garden.varietyCount(harvests,detail)} 颗")}},confirmButton={FocusTextButton({detail=-1}){Text("关闭")}})
     Column(verticalArrangement=Arrangement.spacedBy(20.dp)) {
         Text("把努力，慢慢攒成一篮甜。",style=MaterialTheme.typography.titleLarge)
         Text("已收获 $harvests 颗番茄 · 已遇见 ${minOf(harvests,Garden.VARIETIES)} 种",color=Muted,style=MaterialTheme.typography.bodyMedium)
@@ -195,7 +211,7 @@ import kotlinx.coroutines.launch
                 GardenVarieties.chunked(columns).forEach {row ->
                     Row(horizontalArrangement=Arrangement.spacedBy(16.dp)) {
                         row.forEach {v -> val i=GardenVarieties.indexOf(v);val count=Garden.varietyCount(harvests,i)
-                            PaperCard(Modifier.weight(1f).testTag("garden_variety_$i")) {
+                            PaperCard(Modifier.weight(1f).clickable { detail=i }.testTag("garden_variety_$i")) {
                                 GardenFruit(i,count>0,Modifier.fillMaxWidth().height(108.dp))
                                 Text(if(count>0) v.name else "还没遇见",style=MaterialTheme.typography.titleMedium)
                                 Text(if(count>0) "收藏 $count 颗" else "第 ${i+1} 次收获时相见",color=Muted,style=MaterialTheme.typography.bodySmall)
@@ -211,3 +227,19 @@ import kotlinx.coroutines.launch
 /** Stable preview API retained for the existing growth-stage render tests. */
 @Composable internal fun GardenPlant(stage:Int,sway:Float,modifier:Modifier=Modifier) =
     GardenLandscape(stage.toFloat(),sway,0f,0f,0,modifier)
+
+internal fun decorMask(harvests:Int) = when { harvests>=6 ->7; harvests>=3 ->3; harvests>=1 ->1; else ->0 }
+
+@Composable internal fun GardenWidget() {
+    val repo=LocalDeskRepo.current ?: return
+    val snapshot by remember(repo){combine(repo.records,repo.gardenUsed){records, used ->
+        Triple(Garden.available(records,used).size,Garden.stage(records,used),Garden.harvests(records,used))
+    }}.collectAsState(initial=Triple(0,0,0))
+    var open by remember {mutableStateOf(false)}
+    PaperCard(Modifier.fillMaxWidth()) {
+        Text("我的花房",style=MaterialTheme.typography.titleMedium)
+        Text("${listOf("种子","萌芽","长叶","开花")[snapshot.second]} · ${snapshot.first} 滴水 · ${snapshot.third} 次收获")
+        FocusTextButton({open=true}){Text("去温室看看")}
+    }
+    if(open) SecretGarden {open=false}
+}

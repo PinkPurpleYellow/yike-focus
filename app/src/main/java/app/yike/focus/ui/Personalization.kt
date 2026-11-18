@@ -37,26 +37,6 @@ fun PersonalizationCard(settings: FocusSettings, onChange: ((FocusSettings) -> F
     val app = context.applicationContext as FocusApplication
     val scope = rememberCoroutineScope()
     var editingAppearance by rememberSaveable { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) scope.launch {
-            busy = true
-            var saved = ""
-            try {
-                saved = withContext(Dispatchers.IO) {
-                    val bytes = ImageStore.readLimited(requireNotNull(context.contentResolver.openInputStream(uri)))
-                    ImageStore.save(context, bytes)
-                }
-                val old = app.repository.currentSettings().backgroundFile
-                app.repository.updateSettings { it.copy(backgroundFile = saved) }
-                withContext(Dispatchers.IO) { ImageStore.file(context, old)?.delete() }
-                app.controller.notice.value = "背景已保存，不再需要原图片的访问权限。"
-            } catch (e: Exception) {
-                if (saved.isNotEmpty()) ImageStore.file(context, saved)?.delete()
-                app.controller.notice.value = "背景未更换：${e.localizedMessage ?: "请重试"}"
-            } finally { busy = false }
-        }
-    }
     PaperCard(Modifier.fillMaxWidth()) {
         Text("外观与主题", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(12.dp))
@@ -78,39 +58,18 @@ fun PersonalizationCard(settings: FocusSettings, onChange: ((FocusSettings) -> F
                     { scope.launch { runCatching { app.repository.setNavDock(target) }.onFailure { app.controller.notice.value = "导航位置未保存，请重试。" } } }, label = { Text(target.title) }, modifier = Modifier.heightIn(min = 48.dp)) }
             }
         }
-        Spacer(Modifier.height(24.dp))
-        Text(if(settings.interfaceMaterial == InterfaceMaterial.GLASS) "全应用玻璃背景" else "专注页与全屏计时背景", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        Text("从系统文件选择器选一张图片，保存在本机，无需照片库权限。", color = Muted, style = MaterialTheme.typography.bodySmall)
-        Spacer(Modifier.height(12.dp))
-        if (settings.backgroundFile.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            Box(Modifier.fillMaxWidth().height(130.dp)) {
-                FocusBackdropHost(settings, independent = true) { }
-            }
-            var shade by remember(settings.backgroundShade) { mutableFloatStateOf(settings.backgroundShade) }
-            Text("遮罩深浅 · ${(shade * 100).toInt()}%", color = Muted, style = MaterialTheme.typography.bodySmall)
-            FocusSlider(shade, { shade = it }, valueRange = 0.55f..0.95f, onValueChangeFinished = { onChange { it.copy(backgroundShade = shade) } })
-        }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FocusOutlinedButton(enabled = !busy, onClick = { picker.launch(arrayOf("image/*")) }) { Text(if (busy) "正在处理图片…" else "选择背景图片") }
-            if (settings.backgroundFile.isNotEmpty()) FocusTextButton(enabled = !busy, onClick = {
-                scope.launch { val old = app.repository.currentSettings().backgroundFile
-                    try {
-                        app.repository.updateSettings { it.copy(backgroundFile = "") }
-                        withContext(Dispatchers.IO) { ImageStore.file(context, old)?.delete() }
-                    } catch (e: Exception) { app.controller.notice.value = "背景未移除，请检查存储空间后重试。" }
-                }
-            }) { Text("移除背景") }
-        }
     }
     if (editingAppearance) AppearanceEditor(settings, onApply = { draft ->
-        onChange { it.copy(uiPreset = draft.uiPreset, timerFace = draft.timerFace,
+        scope.launch { try {
+            val old=app.repository.currentSettings().backgroundFile
+            app.repository.updateSettings { it.copy(backgroundFile=draft.backgroundFile,backgroundShade=draft.backgroundShade,uiPreset = draft.uiPreset, timerFace = draft.timerFace,
             uiDensity = draft.uiDensity, decorativeMotion = draft.decorativeMotion,
             themeStyle = draft.themeStyle, themeMode = draft.themeMode,
             interfaceMaterial = draft.interfaceMaterial, glassTransparency = draft.glassTransparency,
             glassBlur = draft.glassBlur, glassReadable = draft.glassReadable) }
-        editingAppearance = false
+            if (old != draft.backgroundFile) withContext(Dispatchers.IO) { ImageStore.file(context,old)?.delete() }
+            editingAppearance = false
+        } catch (e:java.io.IOException) { app.controller.notice.value="外观保存失败，请重试。" } }
     }, onDismiss = { editingAppearance = false })
 
 }

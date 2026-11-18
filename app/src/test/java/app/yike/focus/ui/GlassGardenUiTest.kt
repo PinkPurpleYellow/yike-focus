@@ -45,7 +45,7 @@ class GlassGardenUiTest {
             val root = view.rootView
             val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
             root.draw(Canvas(bitmap))
-            val file = File("build/outputs/2.4.0/$name.png"); file.parentFile!!.mkdirs()
+            val file = File("build/outputs/3.0.0/$name.png"); file.parentFile!!.mkdirs()
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }; bitmap.recycle()
         }
     }
@@ -157,6 +157,7 @@ class GlassGardenUiTest {
         compose.setContent { FocusTheme(settings) {
             AppScaffold(settings,2,java.time.LocalDate.of(2026,11,12),onPage = {}) { SettingsScreen(settings) {} }
         } }
+        compose.onNodeWithTag("settings_section_5").performScrollTo().performClick()
         compose.onNodeWithTag("secret_tomato").performScrollTo()
         repeat(6) { compose.onNodeWithTag("secret_tomato").performClick() }
         compose.onAllNodesWithTag("secret_garden").assertCountEquals(0)

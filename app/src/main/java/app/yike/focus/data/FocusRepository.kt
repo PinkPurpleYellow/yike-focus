@@ -79,6 +79,14 @@ class FocusRepository(context: Context) {
     val legalConsentVersion = preferences.data.map { it[Keys.consent] ?: 0 }.distinctUntilChanged()
     suspend fun setLegalConsentVersion(version: Int) { preferences.edit { it[Keys.consent] = version } }
     suspend fun hasConsent() = legalConsentVersion.first() >= LEGAL_VERSION
+    val workspace = preferences.data.map { it[Keys.workspace] ?: "{}" }.distinctUntilChanged()
+    suspend fun reviseWorkspace(transform: (JSONObject) -> Unit) {
+        preferences.edit { prefs ->
+            val json = JSONObject(prefs[Keys.workspace] ?: "{}")
+            transform(json)
+            prefs[Keys.workspace] = json.toString()
+        }
+    }
     val settings = preferences.data.map(::decodeSettings).distinctUntilChanged()
     val gardenUsed = preferences.data.map { it[Keys.gardenUsed] ?: emptySet() }.distinctUntilChanged()
     val navDock = preferences.data.map { enumOrDefault(it[Keys.navDock], NavDock.BOTTOM) }.distinctUntilChanged()
@@ -171,6 +179,7 @@ class FocusRepository(context: Context) {
 
     companion object { const val LEGAL_VERSION = 1 }
     private object Keys {
+        val workspace = stringPreferencesKey("workspace_v1")
         val consent = intPreferencesKey("legal_consent_version")
         val material = stringPreferencesKey("interface_material")
         val transparency = floatPreferencesKey("glass_transparency")

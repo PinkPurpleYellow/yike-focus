@@ -52,7 +52,7 @@ class LayoutMatrixTest {
             val root = view.rootView
             val image = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
             root.draw(Canvas(image))
-            val file = File("build/outputs/layout-matrix-2.4.0/$name.png")
+            val file = File("build/outputs/layout-matrix-3.0.0/$name.png")
             file.parentFile!!.mkdirs()
             file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
             image.recycle()
@@ -101,6 +101,7 @@ class LayoutMatrixTest {
         assertTextFitsHorizontally()
         snapshot(requireNotNull(view), "$name-statistics-font2")
         compose.onNodeWithTag("nav_2").performClick()
+        compose.onNodeWithTag("settings_section_5").performScrollTo().performClick()
         compose.onNodeWithTag("developer_email").performScrollTo().assertTextEquals("ff1921570609@outlook.com")
         assertTextFitsHorizontally()
         snapshot(requireNotNull(view), "$name-about-font2")

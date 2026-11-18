@@ -69,7 +69,7 @@ class AppearanceUiTest {
                         val root = requireNotNull(hostView).rootView
                         val image = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
                         root.draw(Canvas(image))
-                        val file = File("build/outputs/appearance-previews-2.4.0/${preset.name}-${mode.name}-page$index.png")
+                        val file = File("build/outputs/appearance-previews-3.0.0/${preset.name}-${mode.name}-page$index.png")
                         requireNotNull(file.parentFile).mkdirs()
                         file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
                         val pixels = (0 until image.width step 8).flatMap { x -> (0 until image.height step 8).map { y -> image.getPixel(x, y) } }.distinct()
@@ -119,6 +119,7 @@ class AppearanceUiTest {
 
     @Test fun aboutShowsOnlyPublicVersionAndKeepsDeveloperContact() {
         compose.setContent { FocusTheme { PreviewHost(FocusSettings(), 2) } }
+        compose.onNodeWithTag("settings_section_5").performScrollTo().performClick()
         compose.onNodeWithTag("app_version").performScrollTo().assertTextEquals("版本 ${app.yike.focus.BuildConfig.VERSION_NAME}")
         compose.onNodeWithTag("developer_name").performScrollTo().assertTextEquals("PinkPurpleYellow")
         compose.onNodeWithTag("developer_email").performScrollTo().assertTextEquals("ff1921570609@outlook.com")

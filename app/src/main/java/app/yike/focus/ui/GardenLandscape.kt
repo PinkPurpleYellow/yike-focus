@@ -35,7 +35,7 @@ internal val GardenVarieties=listOf(
 }
 
 /** Drawn vectors, no perpetual animation or external artwork. Values only change on interaction. */
-@Composable internal fun GardenLandscape(growth:Float,sway:Float,water:Float,picking:Float,variety:Int,modifier:Modifier=Modifier,collected:Int=0) {
+@Composable internal fun GardenLandscape(growth:Float,sway:Float,water:Float,picking:Float,variety:Int,modifier:Modifier=Modifier,collected:Int=0,decor:Int=0) {
     val dark=Paper.luminance()<.5f
     val stage=growth.toInt().coerceIn(0,4)
     Canvas(modifier.clip(RoundedCornerShape(24.dp)).semantics {contentDescription="番茄花房，${listOf("种子","萌芽","长叶","开花","结果")[stage]}"}) {
@@ -60,14 +60,14 @@ internal val GardenVarieties=listOf(
                     drawPath(beam,Color(0xFFFFF7DB).copy(alpha=.25f))
                 }
                 val hills=Path().apply {moveTo(0f,270f);cubicTo(130f,145f,215f,300f,350f,219f);cubicTo(420f,187f,495f,219f,540f,261f);lineTo(540f,300f);lineTo(0f,300f);close()}
-                drawPath(hills,if(dark) Color(0xFF3A5754) else Color(0xFFADC5AE))
+                drawPath(hills,if(decor and 4 != 0) Color(0xFF9CA4CC) else if(dark) Color(0xFF3A5754) else Color(0xFFADC5AE))
                 drawLine(if(dark) Color(0xFF85918B) else Color(0xFFF8F3E7),Offset(260f,35f),Offset(260f,296f),5f)
                 drawLine(if(dark) Color(0xFF85918B) else Color(0xFFF8F3E7),Offset(66f,176f),Offset(454f,176f),5f)
             }
             drawPath(win,if(dark) Color(0xFF91A09A).copy(alpha=.45f) else Color.White.copy(alpha=.76f),style=Stroke(4f))
             drawRoundRect(if(dark) Color(0xFF65756D) else Color(0xFFE7DDC7),Offset(53f,292f),Size(414f,13f),CornerRadius(5f))
             // A quiet shelf with a tiny succulent, seed packet and terracotta dish.
-            drawRoundRect(if(dark) Color(0xFF4E5E56) else Color(0xFFE1D5BF),Offset(0f,336f),Size(520f,124f),CornerRadius(0f))
+            drawRoundRect(if(decor and 2 != 0) Color(0xFF8F6656) else if(dark) Color(0xFF4E5E56) else Color(0xFFE1D5BF),Offset(0f,336f),Size(520f,124f),CornerRadius(0f))
             drawLine(Color.White.copy(alpha=if(dark) .08f else .35f),Offset(18f,354f),Offset(502f,354f),1f)
             drawOval(Color.Black.copy(alpha=.06f),Offset(66f,360f),Size(114f,14f))
             drawRoundRect(if(dark) Color(0xFF7E8980) else Color(0xFFC5CBB6),Offset(91f,318f),Size(42f,40f),CornerRadius(9f))
@@ -128,10 +128,10 @@ internal val GardenVarieties=listOf(
             }
             // Soft clay shading and a wide lip ground the plant in the scene.
             val pot=Path().apply {moveTo(218f,333f);lineTo(302f,333f);lineTo(292f,387f);quadraticTo(260f,399f,228f,387f);close()}
-            drawPath(pot,Brush.horizontalGradient(listOf(Color(0xFFB57D66),Color(0xFFD19C7E),Color(0xFFBD8268)),218f,302f))
+            drawPath(pot,Brush.horizontalGradient(if(decor and 1 != 0) listOf(Color(0xFF599187),Color(0xFFB6DFCC),Color(0xFF6B9F90)) else listOf(Color(0xFFB57D66),Color(0xFFD19C7E),Color(0xFFBD8268)),218f,302f))
             drawOval(Color(0xFF8F6753),Offset(216f,325f),Size(88f,20f))
             drawOval(Color(0xFF685145),Offset(223f,328f),Size(74f,12f))
-            drawRoundRect(Color(0xFFCC977A),Offset(211f,334f),Size(98f,12f),CornerRadius(5f))
+            drawRoundRect(if(decor and 1 != 0) Color(0xFF94C2B1) else Color(0xFFCC977A),Offset(211f,334f),Size(98f,12f),CornerRadius(5f))
             drawLine(Color.White.copy(alpha=.22f),Offset(235f,353f),Offset(240f,381f),3f,StrokeCap.Round)
             if(water>0f && water<1f) {
                 for(i in 0..15) {

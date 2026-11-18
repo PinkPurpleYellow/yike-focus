@@ -1,5 +1,7 @@
 package app.yike.focus.ui
 
+import app.yike.focus.FocusApplication
+
 import android.app.AlarmManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -79,6 +81,10 @@ fun SettingsScreen(settings: FocusSettings, onChange: ((FocusSettings) -> FocusS
 
     SectionTitle("找到适合你的节奏。", "时间、声音和提醒，都可以按你的习惯来。")
     Spacer(Modifier.height(LayoutGap))
+    val deskApp=context.applicationContext as FocusApplication
+    val workspace by deskApp.repository.workspace.collectAsState(initial="{}")
+    val gardenUsed by deskApp.repository.gardenUsed.collectAsState(initial=emptySet())
+    if(org.json.JSONObject(workspace).optBoolean("discovered") || gardenUsed.isNotEmpty()) FocusTonalButton({garden=true}){Text("我的花房")}
     SettingsPanels(listOf(
         SettingsSection("专注节奏") {
             PaperCard(Modifier.fillMaxWidth()) {

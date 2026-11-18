@@ -42,7 +42,8 @@ fun AppScaffold(settings: FocusSettings, page: Int, today: LocalDate,
                         val padding = if (settings.uiDensity == UiDensity.COMPACT) 16.dp else if (wide) 32.dp else 24.dp
                         CompositionLocalProvider(LocalContentHeight provides (maxHeight - padding * 2)) {
                             key(page) {
-                                Column(Modifier.widthIn(max = 1360.dp).fillMaxWidth().verticalScroll(rememberScrollState())
+                            val viewportScroll = rememberScrollState()
+                                Column(Modifier.widthIn(max = 1360.dp).fillMaxWidth().verticalScroll(viewportScroll)
                                     .padding(padding).testTag("page_scroll")) {
                                     WallpaperContent(enabled = page == 0) {
                                     FlowRow(Modifier.fillMaxWidth().testTag("page_header"), horizontalArrangement = Arrangement.SpaceBetween,
@@ -53,7 +54,7 @@ fun AppScaffold(settings: FocusSettings, page: Int, today: LocalDate,
                                     }
                                     }
                                     Spacer(Modifier.height(16.dp))
-                                    content()
+                                    CompositionLocalProvider(LocalDeskScroll provides viewportScroll) { content() }
                                     Spacer(Modifier.height(24.dp))
                                 }
                             }

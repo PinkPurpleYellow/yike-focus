@@ -1,5 +1,10 @@
 package app.yike.focus.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import app.yike.focus.data.ImageStore
+import kotlinx.coroutines.*
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -43,12 +48,31 @@ fun AppearanceEditor(settings: FocusSettings, onApply: (FocusSettings) -> Unit, 
     var blur by rememberSaveable { mutableFloatStateOf(settings.glassBlur) }
     var readable by rememberSaveable { mutableStateOf(settings.glassReadable) }
     var page by rememberSaveable { mutableIntStateOf(0) }
-    val draft = settings.copy(uiPreset = UiPreset.valueOf(preset), timerFace = TimerFace.valueOf(face),
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var picture by rememberSaveable {mutableStateOf(settings.backgroundFile)}
+    var shade by rememberSaveable {mutableFloatStateOf(settings.backgroundShade)}
+    var picking by remember {mutableStateOf(false)}
+    var fileError by remember {mutableStateOf<String?>(null)}
+    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if(uri!=null) scope.launch {
+            picking=true
+            try {
+                val next=withContext(Dispatchers.IO) { ImageStore.save(context,ImageStore.readLimited(requireNotNull(context.contentResolver.openInputStream(uri)))) }
+                if(picture!=settings.backgroundFile) ImageStore.file(context,picture)?.delete()
+                picture=next
+            } catch(e:java.io.IOException) { fileError="图片读取失败，请重新选择。" }
+            catch(e:IllegalArgumentException) { fileError="这张图片暂时无法使用。" }
+            finally { picking=false }
+        }
+    }
+    fun cancelDraft() { if(picture!=settings.backgroundFile) ImageStore.file(context,picture)?.delete();onDismiss() }
+    val draft = settings.copy(backgroundFile=picture,backgroundShade=shade,uiPreset = UiPreset.valueOf(preset), timerFace = TimerFace.valueOf(face),
         uiDensity = UiDensity.valueOf(density), decorativeMotion = motion,
         themeStyle = ThemeStyle.valueOf(color), themeMode = ThemeMode.valueOf(mode),
         interfaceMaterial = InterfaceMaterial.valueOf(material), glassTransparency = transparency,
         glassBlur = blur, glassReadable = readable)
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = ::cancelDraft, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         FocusTheme(draft) {
         FocusBackdropHost(draft, independent = true) {
         Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).testTag("theme_editor"), color = androidx.compose.ui.graphics.Color.Transparent) {
@@ -58,11 +82,23 @@ fun AppearanceEditor(settings: FocusSettings, onApply: (FocusSettings) -> Unit, 
                         Text("外观与主题", style = MaterialTheme.typography.headlineMedium)
                         Text("先看看，再选一套适合自己的界面", color = Muted, style = MaterialTheme.typography.bodySmall)
                     }
-                    FocusTextButton(onClick = onDismiss, modifier = Modifier.testTag("cancel_appearance")) { Text("取消") }
+                    FlowRow(Modifier.widthIn(max=174.dp),horizontalArrangement=Arrangement.End) {
+                        FocusTextButton(onClick=::cancelDraft, modifier=Modifier.testTag("cancel_appearance")){Text("取消")}
+                        FocusButton(enabled=!picking,onClick={onApply(draft)},modifier=Modifier.testTag("apply_appearance")){Text("应用外观")}
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
+                var section by rememberSaveable {mutableIntStateOf(0)}
+                var showPreview by rememberSaveable {mutableStateOf(false)}
                 val options: @Composable () -> Unit = {
-                    Text("界面材质", style = MaterialTheme.typography.titleMedium)
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {listOf("预设","材质与配色","时钟与密度","壁纸").forEachIndexed {i,label -> FocusFilterChip(section==i,{section=i},{Text(label)},modifier=Modifier.testTag("appearance_section_$i"))}}
+                    if(section==3) {
+                        Box(Modifier.fillMaxWidth().height(160.dp).clip(ButtonShape)){FocusBackdropHost(draft,independent=true){}}
+                        FocusOutlinedButton({picker.launch(arrayOf("image/*"))},enabled=!picking){Text("选择壁纸")}
+                        if(picture.isNotEmpty()) {FocusSlider(shade,{shade=it},valueRange=.55f..95f/100);FocusTextButton({if(picture!=settings.backgroundFile)ImageStore.file(context,picture)?.delete();picture=""}){Text("移除壁纸")}}
+                        fileError?.let { Text(it,color=Tomato) }
+                    }
+                    if(section==1) { Text("界面材质", style = MaterialTheme.typography.titleMedium)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         InterfaceMaterial.entries.forEach { item ->
                             FocusFilterChip(draft.interfaceMaterial == item, { material = item.name }, label = { Text(item.title) },
@@ -82,7 +118,8 @@ fun AppearanceEditor(settings: FocusSettings, onApply: (FocusSettings) -> Unit, 
                         Text("全页玻璃与壁纸相融；拖动导航、开关和滑块可感受透镜。旧安卓提供兼容效果。", color = Muted, style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(Modifier.height(24.dp))
-                    Text("界面预设", style = MaterialTheme.typography.titleMedium)
+                    }
+                    if(section==0) { Text("界面预设", style = MaterialTheme.typography.titleMedium)
                     UiPreset.entries.forEach { item ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).then(if(draft.interfaceMaterial == InterfaceMaterial.GLASS) Modifier.glassSurface(ButtonShape,GlassRole.CONTROL).background(Tomato.copy(alpha=if(draft.uiPreset==item) .12f else 0f),ButtonShape) else Modifier.background(if(draft.uiPreset==item) Peach else CardPaper,ButtonShape))
                             .then(if (draft.interfaceMaterial == InterfaceMaterial.TRADITIONAL) Modifier.border(1.dp, if (draft.uiPreset == item) Tomato else Line, ButtonShape) else Modifier)
@@ -98,7 +135,8 @@ fun AppearanceEditor(settings: FocusSettings, onApply: (FocusSettings) -> Unit, 
                         }
                     }
                     Spacer(Modifier.height(24.dp))
-                    Text("配色", style = MaterialTheme.typography.titleMedium)
+                    }
+                    if(section==1) { Text("配色", style = MaterialTheme.typography.titleMedium)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ThemeStyle.entries.forEach { item -> FocusFilterChip(draft.themeStyle == item, { color = item.name }, label = { Text(item.title, style = MaterialTheme.typography.bodyMedium) }, shape = SmallShape, modifier = Modifier.heightIn(min = 48.dp)) }
                     }
@@ -106,7 +144,8 @@ fun AppearanceEditor(settings: FocusSettings, onApply: (FocusSettings) -> Unit, 
                         ThemeMode.entries.forEach { item -> FocusFilterChip(draft.themeMode == item, { mode = item.name }, label = { Text(item.title, style = MaterialTheme.typography.bodyMedium) }, shape = SmallShape, modifier = Modifier.heightIn(min = 48.dp)) }
                     }
                     Spacer(Modifier.height(16.dp))
-                    Text("计时器造型", style = MaterialTheme.typography.titleMedium)
+                    }
+                    if(section==2) { Text("计时器造型", style = MaterialTheme.typography.titleMedium)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TimerFace.entries.forEach { item -> FocusFilterChip(draft.timerFace == item, { face = item.name }, label = { Text(item.title, style = MaterialTheme.typography.bodyMedium) }, shape = SmallShape, modifier = Modifier.heightIn(min = 48.dp)) }
                     }
@@ -126,25 +165,24 @@ fun AppearanceEditor(settings: FocusSettings, onApply: (FocusSettings) -> Unit, 
                     }) { Text("恢复预设默认") }
                     Text("只重置造型、密度及动效，保留配色、明暗与背景图。", color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
+                }
                 val preview: @Composable () -> Unit = {
                     PreviewPages(page) { page = it }
                     Spacer(Modifier.height(8.dp))
                     Text("示例数据预览 · 不影响计时和记录", color = Muted, style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(8.dp))
-                    AppearancePreview(draft, page) { page = it }
+                    CompositionLocalProvider(LocalDeskRepo provides null) { AppearancePreview(draft, page) { page = it } }
                 }
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                     if (maxWidth >= 1050.dp) Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                         Column(Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(end = 8.dp)) { options() }
                         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) { preview() }
                     } else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                        options(); preview()
+                        FocusTextButton({showPreview=!showPreview}){Text(if(showPreview) "返回外观选项" else "查看预览")}
+                        if(showPreview) preview() else options()
                     }
                 }
-                HorizontalDivider(color = Line)
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
-                    FocusButton(onClick = { onApply(draft) }, modifier = Modifier.heightIn(min = 48.dp).testTag("apply_appearance")) { Text("应用这套外观") }
-                }
+
             }
         }
         }

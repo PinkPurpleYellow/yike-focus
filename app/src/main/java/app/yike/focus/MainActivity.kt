@@ -157,7 +157,7 @@ class MainActivity : ComponentActivity() {
             onDock = { target -> app.applicationScope.launchSafe({ controller.notice.value = "导航位置未保存，请重试。" }) { app.repository.setNavDock(target) } }) {
             if (!loaded) Box(Modifier.fillMaxWidth().heightIn(min = 200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             else {
-                when (page) {
+                CompositionLocalProvider(LocalDeskRepo provides app.repository) { when (page) {
                     0 -> FocusScreen(
                         state, settings, elapsed, tasks, selectedTaskId, todayStats,
                         onFullscreen = { app.soundPlayer.cancelPreview(); fullscreen = true },
@@ -175,7 +175,7 @@ class MainActivity : ComponentActivity() {
                     )
                     1 -> StatsScreen(records, liveRecord, today, todayStats, settings.dailyGoal)
                     else -> SettingsScreen(settings, controller::updateSettings)
-                }
+                } }
             }
         }
         }

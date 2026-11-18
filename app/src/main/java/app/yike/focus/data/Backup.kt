@@ -1,5 +1,6 @@
 package app.yike.focus.data
 
+import kotlinx.coroutines.flow.first
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -20,7 +21,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 data class BackupData(val tasks: List<TaskEntity>, val records: List<FocusRecord>, val settings: FocusSettings,
-    val background: ByteArray? = null, val exportedAt: Long = System.currentTimeMillis(), val gardenUsed: Set<String>? = null)
+    val background: ByteArray? = null, val exportedAt: Long = System.currentTimeMillis(), val gardenUsed: Set<String>? = null, val workspace: String? = null)
 data class MergePlan(val tasks: List<TaskEntity>, val records: List<FocusRecord>, val duplicates: Int, val conflicts: Int)
 data class ImportResult(val tasks: Int, val records: Int, val duplicates: Int, val conflicts: Int, val settingsRestored: Boolean?, val settingsError: Boolean, val gardenRestored: Boolean? = null)
 
@@ -50,6 +51,7 @@ object BackupCodec {
         return JSONObject().apply {
             put("formatVersion", 1); put("applicationId", "app.yike.focus"); put("appVersion", BuildConfig.VERSION_NAME)
             put("exportedAt", data.exportedAt)
+            data.workspace?.let { put("workspace", JSONObject(it)) }
             data.gardenUsed?.let { put("garden", JSONObject().put("usedRecordIds", JSONArray(it.sorted()))) }
             put("tasks", JSONArray().apply { data.tasks.forEach { t -> put(JSONObject().apply {
                 put("id", t.id); put("title", t.title); put("createdAt", t.createdAt); put("updatedAt", t.updatedAt)
@@ -131,7 +133,7 @@ object BackupCodec {
         require(listOf(settings.focusMinutes, settings.shortBreakMinutes, settings.longBreakMinutes).all { it in 1..180 }
             && settings.longBreakEvery in 1..12 && settings.dailyGoal in 1..40)
         image?.let { ImageStore.validate(it) }
-        return BackupData(tasks, records, settings, image, j.getLong("exportedAt"), garden)
+        return BackupData(tasks, records, settings, image, j.getLong("exportedAt"), garden, j.optJSONObject("workspace")?.toString()?.also { require(it.length <= 8192) })
     }
 
     fun write(output: OutputStream, data: BackupData) {
@@ -201,9 +203,10 @@ object ImageStore {
 class BackupManager(private val context: Context, private val repository: FocusRepository) {
     suspend fun export(uri: Uri) = withContext(Dispatchers.IO) {
         val settings = repository.currentSettings()
+        val desk = repository.workspace.first()
         val used = repository.currentGardenUsed()
         val data = repository.database.withTransaction { BackupData(repository.dao.allTasks(), repository.dao.allRecords().map { it.toDomain() }, settings,
-            ImageStore.file(context, settings.backgroundFile)?.readBytes(), gardenUsed = Garden.validUsed(repository.dao.allRecords().map { it.toDomain() }, used)) }
+            ImageStore.file(context, settings.backgroundFile)?.readBytes(), workspace = desk, gardenUsed = Garden.validUsed(repository.dao.allRecords().map { it.toDomain() }, used)) }
         requireNotNull(context.contentResolver.openOutputStream(uri, "wt")).use { BackupCodec.write(it, data) }
     }
     suspend fun read(uri: Uri): BackupData = withContext(Dispatchers.IO) {
@@ -220,6 +223,12 @@ class BackupManager(private val context: Context, private val repository: FocusR
         var settingsError = false
         if (restoreSettings) {
             try { val old = repository.currentSettings().backgroundFile
+                data.workspace?.let { saved ->
+                    val incoming = JSONObject(saved)
+                    repository.reviseWorkspace { local ->
+                        for (key in listOf("focus", "stats", "decor", "discovered")) if (incoming.has(key)) local.put(key, incoming.get(key))
+                    }
+                }
                 repository.updateSettings { data.settings.copy(backgroundFile = imageName) }; ImageStore.file(context, old)?.delete() }
             catch (e: Exception) { settingsError = true; ImageStore.file(context, imageName)?.delete() }
         }

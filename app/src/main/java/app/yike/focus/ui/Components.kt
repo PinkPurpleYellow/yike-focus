@@ -117,10 +117,12 @@ fun FocusTonalButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled
         else IconButton(onClick,modifier.focusOutline(source),enabled=enabled,interactionSource=source,content=content)
         return
     }
-    Box(modifier.sizeIn(minWidth = 48.dp,minHeight = 48.dp).clip(ButtonShape)
-        .graphicsLayer { alpha = if (enabled) 1f else .46f }.then(if (enabled) Modifier.glassTouch(touch) else Modifier).glassSurface(ButtonShape,GlassRole.CONTROL,interaction=touch).focusOutline(source)
-        .clickable(enabled=enabled,role=Role.Button,interactionSource=source,indication=androidx.compose.foundation.LocalIndication.current,onClick=onClick),
-        contentAlignment=Alignment.Center) { content() }
+    Box(modifier.sizeIn(minWidth = 48.dp,minHeight = 48.dp)
+        .focusOutline(source).clickable(enabled=enabled, role=Role.Button, interactionSource=source,
+            indication=androidx.compose.foundation.LocalIndication.current, onClick=onClick), contentAlignment=Alignment.Center) {
+        Box(Modifier.size(38.dp).glassTouch(touch).glassSurface(ButtonShape,GlassRole.CONTROL,interaction=touch)
+            .graphicsLayer { alpha = if(enabled) 1f else .46f }, contentAlignment=Alignment.Center) { content() }
+    }
 }
 
 @Composable fun FocusSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {

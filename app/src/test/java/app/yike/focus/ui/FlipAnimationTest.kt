@@ -83,7 +83,7 @@ class FlipAnimationTest {
             val pixels = IntArray(bitmap.width * bitmap.height)
             bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
             hash = pixels.contentHashCode()
-            val file = File("build/outputs/flip-frames-2.4.0/$name.png")
+            val file = File("build/outputs/flip-frames-3.0.0/$name.png")
             file.parentFile!!.mkdirs()
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()

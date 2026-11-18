@@ -65,7 +65,8 @@ internal fun nearestDock(center: Offset, width: Float, height: Float, sides: Boo
                 BoxWithConstraints(Modifier.fillMaxSize().padding(start = left, end = right), contentAlignment = Alignment.TopCenter) {
                     CompositionLocalProvider(LocalContentHeight provides (maxHeight - padding * 2 - top - bottom)) {
                         key(page) {
-                            Column(Modifier.widthIn(max = 1360.dp).fillMaxWidth().verticalScroll(rememberScrollState())
+                            val viewportScroll = rememberScrollState()
+                            Column(Modifier.widthIn(max = 1360.dp).fillMaxWidth().verticalScroll(viewportScroll)
                                 // Navigation floats over the full scroll viewport. Keep end clearance
                                 // inside the scroll content, never as a strip that clips the cards.
                                 .padding(start = padding, end = padding, top = padding + top, bottom = padding + bottom)
@@ -78,7 +79,7 @@ internal fun nearestDock(center: Offset, width: Float, height: Float, sides: Boo
                                     }
                                 }
                                 Spacer(Modifier.height(16.dp))
-                                CompositionLocalProvider(LocalDialogBackdrop provides source) { content() }
+                                CompositionLocalProvider(LocalDialogBackdrop provides source, LocalDeskScroll provides viewportScroll) { content() }
                                 Spacer(Modifier.height(24.dp))
                             }
                         }
