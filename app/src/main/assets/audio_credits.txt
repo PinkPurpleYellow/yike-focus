@@ -1,0 +1,25 @@
+一刻专注 音源来源与许可
+
+以下自然音为真实环境录音，来源 Freesound，逐项核验为 CC0 1.0。
+CC0 许可：https://creativecommons.org/publicdomain/zero/1.0/
+本应用进行了选段、均衡、响度调整及循环接缝处理。音源随应用离线提供，无需联网。
+
+轻雨：shelbyshark（Freesound #501243）
+https://freesound.org/people/shelbyshark/sounds/501243/
+许可：CC0 1.0；使用高质量预览版录音作为加工来源。
+
+溪流：s-light（Freesound #514683）
+https://freesound.org/people/s-light/sounds/514683/
+许可：CC0 1.0；使用高质量预览版录音作为加工来源。
+
+缓浪：nofeedbak（Freesound #431853）
+https://freesound.org/people/nofeedbak/sounds/431853/
+许可：CC0 1.0；使用高质量预览版录音作为加工来源。
+
+炉火：silencyo（Freesound #81801）
+https://freesound.org/people/silencyo/sounds/81801/
+许可：CC0 1.0；使用高质量预览版录音作为加工来源。
+
+柔和白噪音、柔和棕噪音及完成提示音：由本项目生成。
+开发者：PinkPurpleYellow
+白噪音做高频衰减；棕噪音去除过强低频，均降低默认播放音量。

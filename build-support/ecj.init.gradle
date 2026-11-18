@@ -1,0 +1,27 @@
+// Build-host workaround: this Windows sandbox denies JDK toRealPath on Documents.
+// ECJ compiles the same generated Room Java sources without that JDK file-manager API.
+// This init script is not part of the delivered Android project.
+allprojects { p ->
+    p.afterEvaluate {
+        p.tasks.withType(JavaCompile).configureEach { t ->
+            t.setActions([])
+            t.doLast {
+                def sources = t.source.files.findAll { it.name.endsWith('.java') }
+                if (sources.isEmpty()) return
+                def sdk = new File(p.rootDir.parentFile, 'tools/android-sdk/platforms/android-35/android.jar')
+                def ecj = new File(p.rootDir.parentFile, 'tools/ecj-3.39.0.jar')
+                def dest = t.destinationDirectory.get().asFile
+                dest.mkdirs()
+                def compilerArgs = ['-source', '1.8', '-target', '1.8', '-encoding', 'UTF-8', '-proc:none', '-nowarn',
+                    '-d', dest.absolutePath, '-bootclasspath', sdk.absolutePath,
+                    '-classpath', t.classpath.files.findAll { it.exists() }.collect { it.absolutePath }.join(File.pathSeparator)]
+                compilerArgs.addAll(sources.collect { it.absolutePath })
+                p.javaexec {
+                    classpath = p.files(ecj)
+                    mainClass = 'org.eclipse.jdt.internal.compiler.batch.Main'
+                    args = compilerArgs
+                }
+            }
+        }
+    }
+}
